@@ -1,0 +1,145 @@
+# GitHub Copilot Actions Configuration
+# Định nghĩa các actions có thể sử dụng với GitHub Copilot CLI
+
+actions:
+  # Teams Actions
+  - name: "Get Teams List"
+    description: "Get list of user's Microsoft Teams"
+    command: "copilot-teams teams"
+    category: "Teams"
+
+  - name: "Get Team Channels"
+    description: "Get channels for a specific team"
+    command: "copilot-teams channels"
+    parameters:
+      - name: "team_id"
+        description: "Team ID"
+        required: true
+        type: "string"
+    category: "Teams"
+
+  - name: "Get Group Chats"
+    description: "Get user's group chats"
+    command: "copilot-teams chats"
+    category: "Teams"
+
+  - name: "Send Channel Message"
+    description: "Send a message to a Teams channel"
+    command: "copilot-teams send-message"
+    parameters:
+      - name: "team_id"
+        description: "Team ID"
+        required: true
+        type: "string"
+      - name: "channel_id"
+        description: "Channel ID"
+        required: true
+        type: "string"
+      - name: "message"
+        description: "Message content"
+        required: true
+        type: "string"
+    category: "Teams"
+
+  - name: "Send Chat Message"
+    description: "Send a message to a group chat"
+    command: "copilot-teams send-chat"
+    parameters:
+      - name: "chat_id"
+        description: "Chat ID"
+        required: true
+        type: "string"
+      - name: "message"
+        description: "Message content"
+        required: true
+        type: "string"
+    category: "Teams"
+
+  - name: "Get Channel Messages"
+    description: "Get messages from a Teams channel"
+    command: "copilot-teams messages"
+    parameters:
+      - name: "team_id"
+        description: "Team ID"
+        required: true
+        type: "string"
+      - name: "channel_id"
+        description: "Channel ID"
+        required: true
+        type: "string"
+      - name: "max_results"
+        description: "Maximum number of messages to return"
+        required: false
+        type: "number"
+        default: 50
+    category: "Teams"
+
+  - name: "Get Chat Messages"
+    description: "Get messages from a group chat"
+    command: "copilot-teams chat-messages"
+    parameters:
+      - name: "chat_id"
+        description: "Chat ID"
+        required: true
+        type: "string"
+      - name: "max_results"
+        description: "Maximum number of messages to return"
+        required: false
+        type: "number"
+        default: 50
+    category: "Teams"
+
+  # Calendar Actions
+  - name: "Get Calendars"
+    description: "Get user's calendars"
+    command: "copilot-teams calendars"
+    category: "Calendar"
+
+  - name: "Get Calendar Events"
+    description: "Get events from a specific calendar"
+    command: "copilot-teams events"
+    parameters:
+      - name: "calendar_id"
+        description: "Calendar ID"
+        required: true
+        type: "string"
+      - name: "max_results"
+        description: "Maximum number of events to return"
+        required: false
+        type: "number"
+        default: 50
+    category: "Calendar"
+
+  # Utility Actions
+  - name: "Show Help"
+    description: "Show available commands and usage"
+    command: "copilot-teams help"
+    category: "Utility"
+
+  - name: "Check API Status"
+    description: "Check if IRIS API is running"
+    command: "curl"
+    parameters:
+      - name: "url"
+        description: "API URL to check"
+        required: false
+        type: "string"
+        default: "http://localhost:8000/docs"
+    category: "Utility"
+
+# Global configuration
+config:
+  default_api_url: "http://localhost:8000"
+  timeout: 30
+  retry_attempts: 3
+  debug: false
+
+# Environment variables required
+required_env_vars:
+  - "IRIS_ACCESS_TOKEN"
+
+# Optional environment variables
+optional_env_vars:
+  - "IRIS_API_URL"
+  - "DEBUG"
+

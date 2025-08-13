@@ -1,0 +1,64 @@
+{
+  "name": "iris-teams-copilot-extension",
+  "version": "1.0.0",
+  "description": "GitHub Copilot extension for IRIS Teams integration",
+  "main": "dist/extension.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "package": "vsce package"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:iris-teams.sendMessage",
+    "onCommand:iris-teams.getTeams",
+    "onCommand:iris-teams.getChats"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "iris-teams.sendMessage",
+        "title": "Send Teams Message",
+        "category": "IRIS Teams"
+      },
+      {
+        "command": "iris-teams.getTeams",
+        "title": "Get Teams List",
+        "category": "IRIS Teams"
+      },
+      {
+        "command": "iris-teams.getChats",
+        "title": "Get Group Chats",
+        "category": "IRIS Teams"
+      }
+    ],
+    "configuration": {
+      "title": "IRIS Teams",
+      "properties": {
+        "irisTeams.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "IRIS Teams API URL"
+        },
+        "irisTeams.accessToken": {
+          "type": "string",
+          "description": "Azure AD Access Token for Teams API"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.0.0",
+    "vsce": "^2.15.0"
+  }
+}

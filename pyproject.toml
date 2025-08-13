@@ -1,0 +1,115 @@
+[tool.poetry]
+name = "iris-backend-v2"
+version = "2.0.0"
+description = "IRIS Digital Assistant - Clean Architecture Implementation"
+authors = ["IRIS Development Team"]
+readme = "README.md"
+python = "^3.10"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+# Web Framework
+fastapi = "^0.104.1"
+uvicorn = {extras = ["standard"], version = "^0.24.0"}
+python-multipart = "^0.0.6"
+
+# Database
+sqlalchemy = "^2.0.23"
+asyncpg = "^0.29.0"
+alembic = "^1.12.1"
+psycopg2-binary = "^2.9.9"
+
+# Redis Cache
+redis = "^5.0.1"
+aioredis = "^2.0.1"
+
+# Security
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+pydantic = {extras = ["email"], version = "^2.5.0"}
+pydantic-settings = "^2.1.0"
+
+# AI/ML
+openai = "^1.3.0"
+sentence-transformers = "^2.2.2"
+numpy = "^1.24.3"
+faiss-cpu = "^1.7.4"
+langchain = "^0.1.0"
+tiktoken = "^0.5.1"
+
+# Utils
+python-dotenv = "^1.0.0"
+httpx = "^0.25.1"
+aiofiles = "^23.2.1"
+tenacity = "^8.2.3"
+
+# Logging & Monitoring
+structlog = "^23.2.0"
+prometheus-client = "^0.19.0"
+
+# Document Processing
+python-docx = "^1.1.0"
+pypdf2 = "^3.0.1"
+beautifulsoup4 = "^4.12.2"
+markdownify = "^0.11.6"
+
+# Vietnamese NLP
+pyvi = "^0.1.1"
+underthesea = "^6.7.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.12.0"
+black = "^23.11.0"
+ruff = "^0.1.6"
+mypy = "^1.7.0"
+pre-commit = "^3.5.0"
+faker = "^20.0.3"
+factory-boy = "^3.3.0"
+httpx = "^0.25.1"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+addopts = [
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

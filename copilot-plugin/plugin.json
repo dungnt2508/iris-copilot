@@ -1,0 +1,24 @@
+{
+  "schema": "https://raw.githubusercontent.com/microsoft/OpenAPI.NET.OData/main/schemas/v4.0.0/OpenAPI.json",
+  "apiVersion": "1.0.0",
+  "nameForHuman": "IRIS Teams Copilot",
+  "nameForModel": "iris_teams_copilot",
+  "descriptionForHuman": "Plugin để tương tác với IRIS Teams API, cho phép quản lý teams, channels, và gửi tin nhắn.",
+  "descriptionForModel": "Plugin này cung cấp các chức năng để tương tác với Microsoft Teams thông qua IRIS API. Bao gồm: lấy danh sách teams, channels, gửi tin nhắn, và quản lý group chats.",
+  "auth": {
+    "type": "oauth2",
+    "instructions": "Sử dụng Azure AD để xác thực với IRIS Teams API",
+    "client_url": "https://iris.pnj.com.vn/auth",
+    "scope": "https://graph.microsoft.com/User.Read https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/ChannelMessage.Send",
+    "authorization_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://iris.pnj.com.vn/api/v1/openapi.json",
+    "isUserAuthenticated": true
+  },
+  "logo_url": "https://iris.pnj.com.vn/logo.png",
+  "contact_email": "support@iris.pnj.com.vn",
+  "legal_info_url": "https://iris.pnj.com.vn/legal"
+}

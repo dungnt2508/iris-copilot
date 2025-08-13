@@ -1,0 +1,51 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.14/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.14",
+  "version": "1.0.0",
+  "id": "{{TEAMS_APP_ID}}",
+  "packageName": "com.iris.teams.copilot",
+  "developer": {
+    "name": "IRIS Team",
+    "websiteUrl": "https://iris.pnj.com.vn",
+    "privacyUrl": "https://iris.pnj.com.vn/privacy",
+    "termsOfUseUrl": "https://iris.pnj.com.vn/terms"
+  },
+  "name": {
+    "short": "IRIS Teams Copilot",
+    "full": "IRIS Teams Integration for Microsoft Copilot"
+  },
+  "description": {
+    "short": "Tích hợp IRIS Teams với Microsoft Copilot",
+    "full": "Plugin cho phép Microsoft Copilot tương tác với IRIS Teams API để quản lý teams, channels, và gửi tin nhắn."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#FFFFFF",
+  "configurableTabs": [],
+  "staticTabs": [],
+  "bots": [],
+  "connectors": [],
+  "composeExtensions": [],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "localhost:8000",
+    "iris.pnj.com.vn"
+  ],
+  "webApplicationInfo": {
+    "id": "{{TEAMS_APP_ID}}",
+    "resource": "https://iris.pnj.com.vn"
+  },
+  "copilotExtensions": {
+    "plugins": [
+      {
+        "file": "plugin.json",
+        "id": "iris-teams-plugin"
+      }
+    ]
+  }
+}

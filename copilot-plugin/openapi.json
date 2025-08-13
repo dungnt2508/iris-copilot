@@ -1,0 +1,554 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "IRIS Teams API",
+    "description": "API để tương tác với Microsoft Teams thông qua IRIS",
+    "version": "1.0.0",
+    "contact": {
+      "name": "IRIS Support",
+      "email": "support@iris.pnj.com.vn"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://iris.pnj.com.vn/api/v1",
+      "description": "Production server"
+    },
+    {
+      "url": "http://localhost:8000/api/v1",
+      "description": "Development server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/teams/teams": {
+      "get": {
+        "summary": "Lấy danh sách teams của user",
+        "description": "Trả về danh sách tất cả teams mà user hiện tại tham gia",
+        "operationId": "getUserTeams",
+        "tags": ["Teams"],
+        "responses": {
+          "200": {
+            "description": "Danh sách teams thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Team"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Token không hợp lệ"
+          }
+        }
+      }
+    },
+    "/teams/teams/{teamId}/channels": {
+      "get": {
+        "summary": "Lấy danh sách channels của team",
+        "description": "Trả về danh sách tất cả channels trong một team cụ thể",
+        "operationId": "getTeamChannels",
+        "tags": ["Teams"],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "description": "ID của team",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách channels thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Channel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/teams/{teamId}/channels/{channelId}/messages": {
+      "get": {
+        "summary": "Lấy tin nhắn từ channel",
+        "description": "Trả về danh sách tin nhắn trong một channel",
+        "operationId": "getChannelMessages",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "description": "ID của team",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "ID của channel",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_results",
+            "in": "query",
+            "required": false,
+            "description": "Số lượng tin nhắn tối đa trả về",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách tin nhắn thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Gửi tin nhắn đến channel",
+        "description": "Gửi một tin nhắn mới đến channel",
+        "operationId": "sendChannelMessage",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "description": "ID của team",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "description": "ID của channel",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tin nhắn được gửi thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/chats": {
+      "get": {
+        "summary": "Lấy danh sách group chats",
+        "description": "Trả về danh sách tất cả group chats của user",
+        "operationId": "getUserChats",
+        "tags": ["Chats"],
+        "responses": {
+          "200": {
+            "description": "Danh sách chats thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Chat"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/chats/{chatId}/messages": {
+      "get": {
+        "summary": "Lấy tin nhắn từ group chat",
+        "description": "Trả về danh sách tin nhắn trong một group chat",
+        "operationId": "getChatMessages",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "description": "ID của chat",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_results",
+            "in": "query",
+            "required": false,
+            "description": "Số lượng tin nhắn tối đa trả về",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách tin nhắn thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Message"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Gửi tin nhắn đến group chat",
+        "description": "Gửi một tin nhắn mới đến group chat",
+        "operationId": "sendChatMessage",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "description": "ID của chat",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tin nhắn được gửi thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendar/calendars": {
+      "get": {
+        "summary": "Lấy danh sách calendars",
+        "description": "Trả về danh sách tất cả calendars của user",
+        "operationId": "getUserCalendars",
+        "tags": ["Calendar"],
+        "responses": {
+          "200": {
+            "description": "Danh sách calendars thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Calendar"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calendar/calendars/{calendarId}/events": {
+      "get": {
+        "summary": "Lấy events từ calendar",
+        "description": "Trả về danh sách events trong một calendar",
+        "operationId": "getCalendarEvents",
+        "tags": ["Calendar"],
+        "parameters": [
+          {
+            "name": "calendarId",
+            "in": "path",
+            "required": true,
+            "description": "ID của calendar",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_results",
+            "in": "query",
+            "required": false,
+            "description": "Số lượng events tối đa trả về",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách events thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Event"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Team": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID của team"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Tên hiển thị của team"
+          },
+          "description": {
+            "type": "string",
+            "description": "Mô tả của team"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": ["private", "public"],
+            "description": "Quyền riêng tư của team"
+          }
+        }
+      },
+      "Channel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID của channel"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Tên hiển thị của channel"
+          },
+          "description": {
+            "type": "string",
+            "description": "Mô tả của channel"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Có phải channel mặc định không"
+          }
+        }
+      },
+      "Chat": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID của chat"
+          },
+          "topic": {
+            "type": "string",
+            "description": "Chủ đề của chat"
+          },
+          "chatType": {
+            "type": "string",
+            "enum": ["group", "oneOnOne"],
+            "description": "Loại chat"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID của tin nhắn"
+          },
+          "content": {
+            "type": "string",
+            "description": "Nội dung tin nhắn"
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Loại nội dung"
+          },
+          "createdDateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Thời gian tạo"
+          },
+          "from": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Nội dung tin nhắn"
+          },
+          "contentType": {
+            "type": "string",
+            "default": "text",
+            "description": "Loại nội dung"
+          }
+        }
+      },
+      "Calendar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID của calendar"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên calendar"
+          },
+          "color": {
+            "type": "string",
+            "description": "Màu sắc của calendar"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Có phải calendar mặc định không"
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID của event"
+          },
+          "subject": {
+            "type": "string",
+            "description": "Tiêu đề event"
+          },
+          "start": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "timeZone": {
+                "type": "string"
+              }
+            }
+          },
+          "end": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "timeZone": {
+                "type": "string"
+              }
+            }
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

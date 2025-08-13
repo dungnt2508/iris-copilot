@@ -1,0 +1,3 @@
+"""
+Calendar Application Module
+"""
