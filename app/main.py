@@ -16,8 +16,8 @@ from starlette.responses import Response
 from app.core.config import settings
 from app.core.logger import setup_logging
 from app.api.v1 import api_router
-from app.infrastructure.db.base import init_db, close_db
-from app.infrastructure.db.session import check_database_health
+from app.wiring import init_database, close_database
+from app.core.logger import get_logger
 
 # Setup logging
 logger = setup_logging(
@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     
     # Initialize database
     try:
-        await init_db()
+        await init_database()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     
     # Close database connections
     try:
-        await close_db()
+        await close_database()
         logger.info("Database connections closed")
     except Exception as e:
         logger.error(f"Database shutdown failed: {e}")
@@ -99,33 +99,33 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Add Trusted Host middleware (security)
-if settings.is_production():
+# Add trusted host middleware
+if settings.allowed_hosts:
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["*.iris.ai", "iris.ai", "infra-inno.pnj.com.vn"]
+        allowed_hosts=settings.allowed_hosts
     )
 
 
-# Request timing middleware
+# Request tracking middleware
 @app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
-    """Add request processing time to response headers"""
+async def track_requests(request: Request, call_next):
+    """Track request metrics"""
     start_time = time.time()
     
-    # Track metrics
+    # Process request
     response = await call_next(request)
     
-    process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
+    # Calculate duration
+    duration = time.time() - start_time
     
-    # Update Prometheus metrics
+    # Record metrics
     REQUEST_COUNT.labels(
         method=request.method,
         endpoint=request.url.path,
@@ -135,147 +135,82 @@ async def add_process_time_header(request: Request, call_next):
     REQUEST_DURATION.labels(
         method=request.method,
         endpoint=request.url.path
-    ).observe(process_time)
+    ).observe(duration)
     
-    return response
-
-
-# Request ID middleware
-@app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    """Add unique request ID for tracing"""
-    import uuid
-    request_id = str(uuid.uuid4())
-    
-    # Add to request state
-    request.state.request_id = request_id
-    
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
+    # Add response headers
+    response.headers["X-Process-Time"] = str(duration)
+    response.headers["X-Request-ID"] = request.headers.get("X-Request-ID", "")
     
     return response
 
 
 # Exception handlers
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    """Custom 404 handler"""
-    return JSONResponse(
-        status_code=404,
-        content={
-            "error": "Not Found",
-            "message": f"The requested resource was not found",
-            "path": str(request.url.path)
-        }
-    )
-
-
-@app.exception_handler(500)
-async def internal_error_handler(request: Request, exc):
-    """Custom 500 handler"""
-    logger.error(f"Internal server error: {exc}", exc_info=True)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler"""
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    
     return JSONResponse(
         status_code=500,
         content={
-            "error": "Internal Server Error",
-            "message": "An unexpected error occurred",
-            "request_id": getattr(request.state, "request_id", None)
+            "error": "Internal server error",
+            "detail": str(exc) if settings.debug else "An unexpected error occurred",
+            "timestamp": time.time()
         }
     )
 
 
-# Root endpoint
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint - API information"""
-    return {
-        "name": settings.app_name,
-        "version": settings.app_version,
-        "environment": settings.environment,
-        "documentation": "/docs" if settings.debug else None,
-        "health": "/health",
-        "metrics": "/metrics" if settings.enable_metrics else None
-    }
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """HTTP exception handler"""
+    logger.warning(f"HTTP exception: {exc.status_code} - {exc.detail}")
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "status_code": exc.status_code,
+            "timestamp": time.time()
+        }
+    )
 
 
 # Health check endpoint
-@app.get("/health", tags=["Health"])
+@app.get("/health")
 async def health_check():
-    """
-    Health check endpoint
-    Returns service health status
-    """
-    health_status = {
+    """Health check endpoint"""
+    return {
         "status": "healthy",
-        "service": settings.app_name,
         "version": settings.app_version,
+        "environment": settings.environment,
         "timestamp": time.time()
     }
-    
-    # Check database
-    try:
-        db_healthy = await check_database_health()
-        health_status["database"] = "healthy" if db_healthy else "unhealthy"
-        if not db_healthy:
-            health_status["status"] = "degraded"
-            logger.error("Database health check failed")
-    except Exception as e:
-        health_status["database"] = "unhealthy"
-        health_status["status"] = "degraded"
-        logger.error(f"Database health check failed: {e}")
-    
-    # Check Redis
-    # try:
-    #     await check_redis_health()
-    #     health_status["cache"] = "healthy"
-    # except Exception as e:
-    #     health_status["cache"] = "unhealthy"
-    #     health_status["status"] = "degraded"
-    #     logger.error(f"Redis health check failed: {e}")
-    
-    return health_status
 
 
 # Metrics endpoint
-if settings.enable_metrics:
-    @app.get("/metrics", tags=["Monitoring"])
-    async def metrics():
-        """Prometheus metrics endpoint"""
-        return Response(
-            content=generate_latest(),
-            media_type="text/plain"
-        )
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain"
+    )
 
 
-# Include API routers
-app.include_router(
-    api_router,
-    prefix=settings.api_v1_prefix
-)
+# Include API routes
+app.include_router(api_router, prefix="/api/v1")
 
 
-# Development only endpoints
-if settings.debug:
-    @app.get("/debug/config", tags=["Debug"])
-    async def debug_config():
-        """Show current configuration (development only)"""
-        from app.api.v1.dependencies import get_repository_info
-        repo_info = await get_repository_info()
-        
-        return {
-            "environment": settings.environment,
-            "debug": settings.debug,
-            "database_url": settings.database_url.split("@")[1] if "@" in settings.database_url else "hidden",
-            "redis_url": settings.redis_url.split("@")[1] if "@" in settings.redis_url else "hidden",
-            "cors_origins": settings.cors_origins,
-            "repository_mode": repo_info["mode"],
-            "features": {
-                "registration": settings.enable_registration,
-                "email_verification": settings.require_email_verification,
-                "social_login": settings.enable_social_login,
-                "rate_limiting": settings.rate_limit_enabled
-            }
-        }
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "IRIS Digital Assistant API",
+        "version": settings.app_version,
+        "docs": "/docs" if settings.debug else None,
+        "health": "/health"
+    }
 
 
 if __name__ == "__main__":
