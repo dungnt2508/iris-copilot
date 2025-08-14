@@ -3,19 +3,49 @@ API v1 Router
 """
 from fastapi import APIRouter
 
-from .routers import auth, chat, teams, upload
-from .routers.copilot import router as copilot_router
-
 # Create main API router
 api_router = APIRouter()
 
-# Include all routers
-api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-api_router.include_router(chat.router, prefix="/chat", tags=["Chat"])
-api_router.include_router(teams.router, prefix="/teams", tags=["Teams"])
-api_router.include_router(upload.router, prefix="/upload", tags=["Upload"])
+# Test endpoint
+@api_router.get("/test")
+async def test_endpoint():
+    """Test endpoint"""
+    return {"message": "API is working!"}
 
-# Include Copilot router
-api_router.include_router(copilot_router, tags=["Copilot"])
+# Try to include routers one by one
+try:
+    from .routers import auth
+    api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+    print("✅ Auth router included")
+except Exception as e:
+    print(f"❌ Error including auth router: {e}")
+
+try:
+    from .routers import chat
+    api_router.include_router(chat.router, prefix="/chat", tags=["Chat"])
+    print("✅ Chat router included")
+except Exception as e:
+    print(f"❌ Error including chat router: {e}")
+
+try:
+    from .routers import teams
+    api_router.include_router(teams.router, prefix="/teams", tags=["Teams"])
+    print("✅ Teams router included")
+except Exception as e:
+    print(f"❌ Error including teams router: {e}")
+
+try:
+    from .routers import upload
+    api_router.include_router(upload.router, prefix="/upload", tags=["Upload"])
+    print("✅ Upload router included")
+except Exception as e:
+    print(f"❌ Error including upload router: {e}")
+
+try:
+    from .routers import azure_ad
+    api_router.include_router(azure_ad.router, tags=["Azure AD"])
+    print("✅ Azure AD router included")
+except Exception as e:
+    print(f"❌ Error including azure_ad router: {e}")
 
 __all__ = ["api_router"]

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.user.repository import UserRepository
 from app.domain.user.entities.user import User, UserRole, UserStatus
 from app.domain.user.value_objects.email import Email
-from app.infrastructure.db.models.user import UserModel
+from app.infrastructure.db.models.user import User as UserModel
 
 
 class SQLAlchemyUserRepository(UserRepository):

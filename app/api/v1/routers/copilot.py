@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
-from app.wiring import get_process_chat_query_use_case, get_db_session
+from app.wiring import get_process_chat_query_use_case, get_db_session, get_search_service, get_llm_service
 from app.application.chat.use_cases.process_chat_query import ProcessChatQueryRequest
 from app.core.logger import get_logger
 

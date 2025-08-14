@@ -32,7 +32,7 @@ class SQLAlchemyChatRepository(ChatRepository):
                 title=session.title,
                 created_at=session.created_at,
                 updated_at=session.updated_at,
-                metadata=session.metadata,
+                chat_metadata=session.metadata,
                 is_active=session.is_active,
                 max_messages=session.max_messages
             )
@@ -47,7 +47,7 @@ class SQLAlchemyChatRepository(ChatRepository):
                     status=message.status.value,
                     created_at=message.created_at,
                     updated_at=message.updated_at,
-                    metadata=message.metadata,
+                    message_metadata=message.metadata,
                     sources=message.sources,
                     tokens_used=message.tokens_used,
                     model_used=message.model_used,
@@ -141,7 +141,7 @@ class SQLAlchemyChatRepository(ChatRepository):
                 status=message.status.value,
                 created_at=message.created_at,
                 updated_at=message.updated_at,
-                metadata=message.metadata,
+                message_metadata=message.metadata,
                 sources=message.sources,
                 tokens_used=message.tokens_used,
                 model_used=message.model_used,
@@ -323,7 +323,7 @@ class SQLAlchemyChatRepository(ChatRepository):
             messages=messages,
             created_at=db_session.created_at,
             updated_at=db_session.updated_at,
-            metadata=db_session.metadata,
+            metadata=db_session.chat_metadata,
             is_active=db_session.is_active,
             max_messages=db_session.max_messages
         )
@@ -338,7 +338,7 @@ class SQLAlchemyChatRepository(ChatRepository):
             status=MessageStatus(db_message.status),
             created_at=db_message.created_at,
             updated_at=db_message.updated_at,
-            metadata=db_message.metadata,
+            metadata=db_message.message_metadata,
             sources=db_message.sources,
             tokens_used=db_message.tokens_used,
             model_used=db_message.model_used,

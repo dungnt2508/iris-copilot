@@ -99,18 +99,18 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Add trusted host middleware
-if settings.allowed_hosts:
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=settings.allowed_hosts
-    )
+# if settings.allowed_hosts:
+#     app.add_middleware(
+#         TrustedHostMiddleware,
+#         allowed_hosts=settings.allowed_hosts
+#     )
 
 
 # Request tracking middleware

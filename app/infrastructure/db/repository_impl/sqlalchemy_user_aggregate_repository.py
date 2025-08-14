@@ -13,7 +13,7 @@ from app.domain.user.entities.user_profile import UserProfile
 from app.domain.user.entities.session import Session
 from app.domain.user.entities.permission import Permission, PermissionType, PermissionScope
 from app.domain.user.value_objects.email import Email
-from app.infrastructure.db.models.user import UserModel
+from app.infrastructure.db.models.user import User as UserModel, UserProfile as UserProfileModel, Session as SessionModel, Permission as PermissionModel
 
 
 class SQLAlchemyUserAggregateRepository(UserAggregateRepository):
@@ -46,25 +46,48 @@ class SQLAlchemyUserAggregateRepository(UserAggregateRepository):
             
             # 2. Save profile (if exists)
             if aggregate.profile:
-                # Note: In real implementation, you'd have a ProfileModel
-                # For now, we'll store profile data in user metadata
-                profile_data = aggregate.profile.to_dict()
-                user_model.user_metadata = user_model.user_metadata or {}
-                user_model.user_metadata["profile"] = profile_data
+                profile_model = self._profile_to_model(aggregate.profile)
+                existing_profile = await self.session.execute(
+                    select(UserProfileModel).where(UserProfileModel.user_id == aggregate.user.id)
+                )
+                profile_model_result = existing_profile.scalar_one_or_none()
+                
+                if profile_model_result:
+                    # Update existing profile
+                    self._update_profile_model(profile_model_result, aggregate.profile)
+                else:
+                    # Create new profile
+                    self.session.add(profile_model)
             
             # 3. Save permissions (if any)
-            # Note: In real implementation, you'd have a PermissionModel
-            # For now, we'll store permissions in user metadata
-            permissions_data = [p.to_dict() for p in aggregate.permissions]
-            user_model.user_metadata = user_model.user_metadata or {}
-            user_model.user_metadata["permissions"] = permissions_data
+            if aggregate.permissions:
+                # Delete existing permissions for this user
+                existing_permissions = await self.session.execute(
+                    select(PermissionModel).where(PermissionModel.user_id == aggregate.user.id)
+                )
+                for perm in existing_permissions.scalars():
+                    await self.session.delete(perm)
+                
+                # Add new permissions
+                for permission in aggregate.permissions:
+                    permission_model = self._permission_to_model(permission)
+                    self.session.add(permission_model)
             
             # 4. Save sessions (if any)
-            # Note: In real implementation, you'd have a SessionModel
-            # For now, we'll store sessions in user metadata
-            sessions_data = [s.to_dict() for s in aggregate.sessions]
-            user_model.user_metadata = user_model.user_metadata or {}
-            user_model.user_metadata["sessions"] = sessions_data
+            if aggregate.sessions:
+                for session in aggregate.sessions:
+                    session_model = self._session_to_model(session)
+                    existing_session = await self.session.execute(
+                        select(SessionModel).where(SessionModel.id == session.id)
+                    )
+                    session_model_result = existing_session.scalar_one_or_none()
+                    
+                    if session_model_result:
+                        # Update existing session
+                        self._update_session_model(session_model_result, session)
+                    else:
+                        # Create new session
+                        self.session.add(session_model)
             
             # 5. Commit transaction
             await self.session.commit()
@@ -109,68 +132,34 @@ class SQLAlchemyUserAggregateRepository(UserAggregateRepository):
         return result.scalar_one_or_none() is not None
     
     async def _model_to_aggregate(self, user_model: UserModel) -> UserAggregate:
-        """Convert ORM model to Domain aggregate"""
-        # 1. Convert user
+        """Convert ORM model to UserAggregate"""
+        # 1. Create user entity
         user = self._model_to_user(user_model)
         
         # 2. Create aggregate
         aggregate = UserAggregate(user=user)
         
-        # 3. Add profile if exists
-        if user_model.user_metadata and "profile" in user_model.user_metadata:
-            profile_data = user_model.user_metadata["profile"]
-            aggregate.profile = UserProfile(
-                id=profile_data["id"],
-                user_id=profile_data["user_id"],
-                avatar_url=profile_data.get("avatar_url"),
-                bio=profile_data.get("bio"),
-                location=profile_data.get("location"),
-                website=profile_data.get("website"),
-                company=profile_data.get("company"),
-                job_title=profile_data.get("job_title"),
-                skills=profile_data.get("skills", []),
-                preferences=profile_data.get("preferences", {}),
-                created_at=datetime.fromisoformat(profile_data["created_at"]),
-                updated_at=datetime.fromisoformat(profile_data["updated_at"])
-            )
+        # 3. Load profile if exists
+        profile_result = await self.session.execute(
+            select(UserProfileModel).where(UserProfileModel.user_id == user_model.id)
+        )
+        profile_model = profile_result.scalar_one_or_none()
+        if profile_model:
+            aggregate.profile = self._model_to_profile(profile_model)
         
-        # 4. Add permissions if exist
-        if user_model.user_metadata and "permissions" in user_model.user_metadata:
-            permissions_data = user_model.user_metadata["permissions"]
-            for perm_data in permissions_data:
-                permission = Permission(
-                    id=perm_data["id"],
-                    user_id=perm_data["user_id"],
-                    name=perm_data["name"],
-                    type=PermissionType(perm_data["type"]),
-                    scope=PermissionScope(perm_data["scope"]),
-                    resource=perm_data.get("resource"),
-                    conditions=perm_data.get("conditions", {}),
-                    granted_at=datetime.fromisoformat(perm_data["granted_at"]),
-                    granted_by=perm_data.get("granted_by"),
-                    expires_at=datetime.fromisoformat(perm_data["expires_at"]) if perm_data.get("expires_at") else None,
-                    is_active=perm_data["is_active"]
-                )
-                aggregate.permissions.append(permission)
+        # 4. Load permissions
+        permissions_result = await self.session.execute(
+            select(PermissionModel).where(PermissionModel.user_id == user_model.id)
+        )
+        for perm_model in permissions_result.scalars():
+            aggregate.permissions.append(self._model_to_permission(perm_model))
         
-        # 5. Add sessions if exist
-        if user_model.user_metadata and "sessions" in user_model.user_metadata:
-            sessions_data = user_model.user_metadata["sessions"]
-            for session_data in sessions_data:
-                session = Session(
-                    id=session_data["id"],
-                    user_id=session_data["user_id"],
-                    token=session_data["token"],
-                    refresh_token=session_data.get("refresh_token"),
-                    device_info=session_data.get("device_info"),
-                    ip_address=session_data.get("ip_address"),
-                    user_agent=session_data.get("user_agent"),
-                    is_active=session_data["is_active"],
-                    expires_at=datetime.fromisoformat(session_data["expires_at"]),
-                    created_at=datetime.fromisoformat(session_data["created_at"]),
-                    last_activity=datetime.fromisoformat(session_data["last_activity"])
-                )
-                aggregate.sessions.append(session)
+        # 5. Load sessions
+        sessions_result = await self.session.execute(
+            select(SessionModel).where(SessionModel.user_id == user_model.id)
+        )
+        for session_model in sessions_result.scalars():
+            aggregate.sessions.append(self._model_to_session(session_model))
         
         return aggregate
     
@@ -229,3 +218,127 @@ class SQLAlchemyUserAggregateRepository(UserAggregateRepository):
         model.department = user.department
         model.permissions = user.permissions
         model.user_metadata = user.metadata
+    
+    # Profile conversion methods
+    def _profile_to_model(self, profile: UserProfile) -> UserProfileModel:
+        """Convert UserProfile entity to ORM model"""
+        return UserProfileModel(
+            id=profile.id,
+            user_id=profile.user_id,
+            avatar_url=profile.avatar_url,
+            bio=profile.bio,
+            location=profile.location,
+            website=profile.website,
+            company=profile.company,
+            job_title=profile.job_title,
+            skills=profile.skills,
+            preferences=profile.preferences,
+            created_at=profile.created_at,
+            updated_at=profile.updated_at
+        )
+    
+    def _model_to_profile(self, model: UserProfileModel) -> UserProfile:
+        """Convert ORM model to UserProfile entity"""
+        return UserProfile(
+            id=model.id,
+            user_id=model.user_id,
+            avatar_url=model.avatar_url,
+            bio=model.bio,
+            location=model.location,
+            website=model.website,
+            company=model.company,
+            job_title=model.job_title,
+            skills=model.skills,
+            preferences=model.preferences,
+            created_at=model.created_at,
+            updated_at=model.updated_at
+        )
+    
+    def _update_profile_model(self, model: UserProfileModel, profile: UserProfile) -> None:
+        """Update existing profile model with profile data"""
+        model.avatar_url = profile.avatar_url
+        model.bio = profile.bio
+        model.location = profile.location
+        model.website = profile.website
+        model.company = profile.company
+        model.job_title = profile.job_title
+        model.skills = profile.skills
+        model.preferences = profile.preferences
+        model.updated_at = profile.updated_at
+    
+    # Permission conversion methods
+    def _permission_to_model(self, permission: Permission) -> PermissionModel:
+        """Convert Permission entity to ORM model"""
+        return PermissionModel(
+            id=permission.id,
+            user_id=permission.user_id,
+            name=permission.name,
+            type=permission.type.value,
+            scope=permission.scope.value,
+            resource=permission.resource,
+            conditions=permission.conditions,
+            granted_by=permission.granted_by,
+            is_active=permission.is_active,
+            granted_at=permission.granted_at,
+            expires_at=permission.expires_at
+        )
+    
+    def _model_to_permission(self, model: PermissionModel) -> Permission:
+        """Convert ORM model to Permission entity"""
+        return Permission(
+            id=model.id,
+            user_id=model.user_id,
+            name=model.name,
+            type=PermissionType(model.type),
+            scope=PermissionScope(model.scope),
+            resource=model.resource,
+            conditions=model.conditions,
+            granted_by=model.granted_by,
+            is_active=model.is_active,
+            granted_at=model.granted_at,
+            expires_at=model.expires_at
+        )
+    
+    # Session conversion methods
+    def _session_to_model(self, session: Session) -> SessionModel:
+        """Convert Session entity to ORM model"""
+        return SessionModel(
+            id=session.id,
+            user_id=session.user_id,
+            token=session.token,
+            refresh_token=session.refresh_token,
+            device_info=session.device_info,
+            ip_address=session.ip_address,
+            user_agent=session.user_agent,
+            is_active=session.is_active,
+            expires_at=session.expires_at,
+            created_at=session.created_at,
+            last_activity=session.last_activity
+        )
+    
+    def _model_to_session(self, model: SessionModel) -> Session:
+        """Convert ORM model to Session entity"""
+        return Session(
+            id=model.id,
+            user_id=model.user_id,
+            token=model.token,
+            refresh_token=model.refresh_token,
+            device_info=model.device_info,
+            ip_address=model.ip_address,
+            user_agent=model.user_agent,
+            is_active=model.is_active,
+            expires_at=model.expires_at,
+            created_at=model.created_at,
+            last_activity=model.last_activity
+        )
+    
+    def _update_session_model(self, model: SessionModel, session: Session) -> None:
+        """Update existing session model with session data"""
+        model.token = session.token
+        model.refresh_token = session.refresh_token
+        model.device_info = session.device_info
+        model.ip_address = session.ip_address
+        model.user_agent = session.user_agent
+        model.is_active = session.is_active
+        model.expires_at = session.expires_at
+        model.last_activity = session.last_activity

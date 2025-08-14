@@ -115,6 +115,46 @@ async def get_process_chat_query_use_case() -> ProcessChatQueryUseCase:
     )
 
 
+# Additional dependencies for API
+from app.infrastructure.db.repository_impl.sqlalchemy_user_repository import SQLAlchemyUserRepository
+from app.services.token_service import TokenService
+from app.services.password_service import PasswordService
+from app.domain.user.repository import UserRepository
+
+async def provide_user_repository_with_session() -> UserRepository:
+    """Provide UserRepository with session"""
+    async with AsyncSessionLocal() as session:
+        return SQLAlchemyUserRepository(session)
+
+
+def provide_token_service() -> TokenService:
+    """Provide TokenService"""
+    return TokenService(secret_key=settings.secret_key)
+
+
+def provide_password_service() -> PasswordService:
+    """Provide PasswordService"""
+    return PasswordService()
+
+
+async def provide_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Provide database session"""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Database session error: {str(e)}")
+            raise
+        finally:
+            await session.close()
+
+
+def get_repository_mode() -> str:
+    """Get repository mode for debugging"""
+    return "sqlalchemy"
+
+
 # Database initialization
 async def init_database():
     """Initialize database tables"""
