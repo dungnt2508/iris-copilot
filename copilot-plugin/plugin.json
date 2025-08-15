@@ -7,16 +7,33 @@
   "descriptionForModel": "Plugin này cung cấp các chức năng để tương tác với Microsoft Teams thông qua IRIS API. Bao gồm: lấy danh sách teams, channels, gửi tin nhắn, và quản lý group chats.",
   "auth": {
     "type": "oauth2",
-    "instructions": "Sử dụng Azure AD để xác thực với IRIS Teams API",
-    "client_url": "https://iris.pnj.com.vn/auth",
+    "instructions": "Sử dụng Azure AD để xác thực với IRIS Teams API thông qua Enterprise SSO",
+    "client_url": "https://infra-inno.pnj.com.vn/rest/oauth2-credential/callback",
     "scope": "https://graph.microsoft.com/User.Read https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/ChannelMessage.Send",
     "authorization_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-    "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+    "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    "callback_domains": [
+      "https://infra-inno.pnj.com.vn",
+      "https://iris.pnj.com.vn"
+    ]
   },
   "api": {
     "type": "openapi",
     "url": "https://iris.pnj.com.vn/api/v1/openapi.json",
     "isUserAuthenticated": true
+  },
+  "agent": {
+    "enabled": true,
+    "endpoints": {
+      "process": "https://iris.pnj.com.vn/agent/process",
+      "workflows": "https://iris.pnj.com.vn/agent/workflows"
+    },
+    "capabilities": [
+      "intent_recognition",
+      "workflow_execution",
+      "error_recovery",
+      "context_management"
+    ]
   },
   "logo_url": "https://iris.pnj.com.vn/logo.png",
   "contact_email": "support@iris.pnj.com.vn",

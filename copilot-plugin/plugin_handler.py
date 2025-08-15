@@ -1,348 +1,289 @@
 """
 Microsoft Copilot Plugin Handler
-Xử lý các requests từ Microsoft Copilot và chuyển tiếp đến IRIS API
+Handles Copilot plugin operations and integrations
 """
-
-import os
 import json
 import logging
-from typing import Dict, Any, Optional
-from fastapi import FastAPI, HTTPException, Depends, Header
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Dict, Any, List, Optional
+from datetime import datetime
 import httpx
-from pydantic import BaseModel
+from fastapi import HTTPException
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="IRIS Copilot Plugin", version="1.0.0")
 
-# Security
-security = HTTPBearer()
-
-# Configuration
-IRIS_API_URL = os.getenv("IRIS_API_URL", "http://localhost:8000")
-PLUGIN_SECRET = os.getenv("PLUGIN_SECRET", "your-secret-key")
-
-class CopilotRequest(BaseModel):
-    """Request model từ Microsoft Copilot"""
-    user_id: str
-    intent: str
-    parameters: Dict[str, Any] = {}
-    context: Dict[str, Any] = {}
-
-class CopilotResponse(BaseModel):
-    """Response model cho Microsoft Copilot"""
-    success: bool
-    data: Optional[Dict[str, Any]] = None
-    message: Optional[str] = None
-    error: Optional[str] = None
-
-class PluginHandler:
-    """Handler chính cho Copilot Plugin"""
+class CopilotPluginHandler:
+    """Handler for Microsoft Copilot plugin operations"""
     
-    def __init__(self):
-        self.iris_api_url = IRIS_API_URL
-        self.client = httpx.AsyncClient()
-    
-    async def handle_request(self, request: CopilotRequest, access_token: str) -> CopilotResponse:
-        """Xử lý request từ Copilot dựa trên intent"""
-        
-        try:
-            logger.info(f"Handling Copilot request: {request.intent}")
-            
-            # Map intent đến action
-            if request.intent == "get_teams":
-                return await self._get_teams(access_token)
-            
-            elif request.intent == "get_channels":
-                team_id = request.parameters.get("team_id")
-                if not team_id:
-                    return CopilotResponse(
-                        success=False,
-                        error="team_id is required"
-                    )
-                return await self._get_channels(team_id, access_token)
-            
-            elif request.intent == "send_message":
-                return await self._send_message(request.parameters, access_token)
-            
-            elif request.intent == "get_chats":
-                return await self._get_chats(access_token)
-            
-            elif request.intent == "get_calendars":
-                return await self._get_calendars(access_token)
-            
-            elif request.intent == "get_events":
-                calendar_id = request.parameters.get("calendar_id")
-                if not calendar_id:
-                    return CopilotResponse(
-                        success=False,
-                        error="calendar_id is required"
-                    )
-                return await self._get_events(calendar_id, access_token)
-            
+    def __init__(self, base_url: str = None):
+        # Use localhost for development, production URL for production
+        import os
+        if base_url is None:
+            if os.getenv("ENVIRONMENT", "development") == "development":
+                self.base_url = "http://localhost:8000"  # IRIS backend local port
             else:
-                return CopilotResponse(
-                    success=False,
-                    error=f"Unknown intent: {request.intent}"
-                )
-                
-        except Exception as e:
-            logger.error(f"Error handling Copilot request: {e}")
-            return CopilotResponse(
-                success=False,
-                error=str(e)
-            )
+                self.base_url = "https://iris.pnj.com.vn"  # Production URL
+        else:
+            self.base_url = base_url
+        self.client = httpx.AsyncClient(timeout=30.0)
     
-    async def _get_teams(self, access_token: str) -> CopilotResponse:
-        """Lấy danh sách teams"""
+    async def authenticate_user(self, access_token: str) -> Dict[str, Any]:
+        """
+        Authenticate user with Azure AD token
+        
+        Args:
+            access_token: Azure AD access token
+            
+        Returns:
+            User authentication info
+        """
         try:
             headers = {"Authorization": f"Bearer {access_token}"}
             response = await self.client.get(
-                f"{self.iris_api_url}/api/v1/teams/teams",
+                f"{self.base_url}/api/v1/auth/me",
                 headers=headers
             )
             response.raise_for_status()
-            
-            teams = response.json()
-            return CopilotResponse(
-                success=True,
-                data={"teams": teams},
-                message=f"Found {len(teams)} teams"
-            )
-            
-        except Exception as e:
-            logger.error(f"Error getting teams: {e}")
-            return CopilotResponse(
-                success=False,
-                error=f"Failed to get teams: {str(e)}"
-            )
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Authentication failed: {e}")
+            raise HTTPException(status_code=401, detail="Invalid access token")
     
-    async def _get_channels(self, team_id: str, access_token: str) -> CopilotResponse:
-        """Lấy danh sách channels của team"""
+    async def get_user_teams(self, access_token: str) -> List[Dict[str, Any]]:
+        """
+        Get user's teams
+        
+        Args:
+            access_token: Azure AD access token
+            
+        Returns:
+            List of user's teams
+        """
         try:
             headers = {"Authorization": f"Bearer {access_token}"}
             response = await self.client.get(
-                f"{self.iris_api_url}/api/v1/teams/teams/{team_id}/channels",
+                f"{self.base_url}/api/v1/teams/teams",
                 headers=headers
             )
             response.raise_for_status()
+            data = response.json()
             
-            channels = response.json()
-            return CopilotResponse(
-                success=True,
-                data={"channels": channels},
-                message=f"Found {len(channels)} channels in team {team_id}"
-            )
+            # Validate response structure
+            if not isinstance(data, list):
+                logger.warning(f"Unexpected response format for teams: {type(data)}")
+                return []
             
-        except Exception as e:
-            logger.error(f"Error getting channels: {e}")
-            return CopilotResponse(
-                success=False,
-                error=f"Failed to get channels: {str(e)}"
-            )
+            return data
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to get teams: {e}")
+            if e.response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid access token")
+            elif e.response.status_code == 403:
+                raise HTTPException(status_code=403, detail="Insufficient permissions")
+            else:
+                raise HTTPException(status_code=500, detail="Failed to retrieve teams")
     
-    async def _send_message(self, parameters: Dict[str, Any], access_token: str) -> CopilotResponse:
-        """Gửi tin nhắn"""
+    async def get_team_channels(self, access_token: str, team_id: str) -> List[Dict[str, Any]]:
+        """
+        Get channels for a specific team
+        
+        Args:
+            access_token: Azure AD access token
+            team_id: Team ID
+            
+        Returns:
+            List of team channels
+        """
         try:
-            team_id = parameters.get("team_id")
-            channel_id = parameters.get("channel_id")
-            chat_id = parameters.get("chat_id")
-            content = parameters.get("content")
+            headers = {"Authorization": f"Bearer {access_token}"}
+            response = await self.client.get(
+                f"{self.base_url}/api/v1/teams/teams/{team_id}/channels",
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to get channels: {e}")
+            raise HTTPException(status_code=500, detail="Failed to retrieve channels")
+    
+    async def send_team_message(
+        self, 
+        access_token: str, 
+        team_id: str, 
+        channel_id: str, 
+        content: str
+    ) -> Dict[str, Any]:
+        """
+        Send message to Teams channel
+        
+        Args:
+            access_token: Azure AD access token
+            team_id: Team ID
+            channel_id: Channel ID
+            content: Message content
             
-            if not content:
-                return CopilotResponse(
-                    success=False,
-                    error="Message content is required"
-                )
-            
-            headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
+        Returns:
+            Sent message info
+        """
+        try:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            payload = {
+                "team_id": team_id,
+                "channel_id": channel_id,
                 "content": content,
                 "content_type": "text"
             }
-            
-            # Gửi đến channel hoặc chat
-            if team_id and channel_id:
-                url = f"{self.iris_api_url}/api/v1/teams/teams/{team_id}/channels/{channel_id}/messages"
-                message_type = "channel"
-            elif chat_id:
-                url = f"{self.iris_api_url}/api/v1/teams/chats/{chat_id}/messages"
-                message_type = "chat"
-            else:
-                return CopilotResponse(
-                    success=False,
-                    error="Either team_id+channel_id or chat_id is required"
-                )
-            
-            response = await self.client.post(url, headers=headers, json=data)
+            response = await self.client.post(
+                f"{self.base_url}/api/v1/teams/teams/{team_id}/channels/{channel_id}/messages",
+                headers=headers,
+                json=payload
+            )
             response.raise_for_status()
-            
-            message = response.json()
-            return CopilotResponse(
-                success=True,
-                data={"message": message},
-                message=f"Message sent successfully to {message_type}"
-            )
-            
-        except Exception as e:
-            logger.error(f"Error sending message: {e}")
-            return CopilotResponse(
-                success=False,
-                error=f"Failed to send message: {str(e)}"
-            )
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to send message: {e}")
+            raise HTTPException(status_code=500, detail="Failed to send message")
     
-    async def _get_chats(self, access_token: str) -> CopilotResponse:
-        """Lấy danh sách group chats"""
+    async def process_chat_query(
+        self, 
+        access_token: str, 
+        query: str, 
+        session_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Process chat query with RAG
+        
+        Args:
+            access_token: Azure AD access token
+            query: User query
+            session_id: Chat session ID
+            context: Additional context
+            
+        Returns:
+            Chat response with sources
+        """
         try:
             headers = {"Authorization": f"Bearer {access_token}"}
-            response = await self.client.get(
-                f"{self.iris_api_url}/api/v1/teams/chats",
-                headers=headers
-            )
-            response.raise_for_status()
-            
-            chats = response.json()
-            return CopilotResponse(
-                success=True,
-                data={"chats": chats},
-                message=f"Found {len(chats)} group chats"
-            )
-            
-        except Exception as e:
-            logger.error(f"Error getting chats: {e}")
-            return CopilotResponse(
-                success=False,
-                error=f"Failed to get chats: {str(e)}"
-            )
-    
-    async def _get_calendars(self, access_token: str) -> CopilotResponse:
-        """Lấy danh sách calendars"""
-        try:
-            headers = {"Authorization": f"Bearer {access_token}"}
-            response = await self.client.get(
-                f"{self.iris_api_url}/api/v1/calendar/calendars",
-                headers=headers
-            )
-            response.raise_for_status()
-            
-            calendars = response.json()
-            return CopilotResponse(
-                success=True,
-                data={"calendars": calendars},
-                message=f"Found {len(calendars)} calendars"
-            )
-            
-        except Exception as e:
-            logger.error(f"Error getting calendars: {e}")
-            return CopilotResponse(
-                success=False,
-                error=f"Failed to get calendars: {str(e)}"
-            )
-    
-    async def _get_events(self, calendar_id: str, access_token: str) -> CopilotResponse:
-        """Lấy events từ calendar"""
-        try:
-            headers = {"Authorization": f"Bearer {access_token}"}
-            response = await self.client.get(
-                f"{self.iris_api_url}/api/v1/calendar/calendars/{calendar_id}/events",
-                headers=headers
-            )
-            response.raise_for_status()
-            
-            events = response.json()
-            return CopilotResponse(
-                success=True,
-                data={"events": events},
-                message=f"Found {len(events)} events in calendar {calendar_id}"
-            )
-            
-        except Exception as e:
-            logger.error(f"Error getting events: {e}")
-            return CopilotResponse(
-                success=False,
-                error=f"Failed to get events: {str(e)}"
-            )
-
-# Initialize handler
-handler = PluginHandler()
-
-@app.post("/copilot/process", response_model=CopilotResponse)
-async def process_copilot_request(
-    request: CopilotRequest,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-):
-    """Endpoint chính để xử lý requests từ Microsoft Copilot"""
-    
-    try:
-        # Validate plugin secret (optional additional security)
-        # if credentials.credentials != PLUGIN_SECRET:
-        #     raise HTTPException(status_code=401, detail="Invalid plugin secret")
-        
-        # Extract user's access token from context or use plugin token
-        user_access_token = request.context.get("access_token", credentials.credentials)
-        
-        # Process request
-        response = await handler.handle_request(request, user_access_token)
-        
-        return response
-        
-    except Exception as e:
-        logger.error(f"Error processing Copilot request: {e}")
-        return CopilotResponse(
-            success=False,
-            error=str(e)
-        )
-
-@app.get("/copilot/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "IRIS Copilot Plugin"}
-
-@app.get("/copilot/capabilities")
-async def get_capabilities():
-    """Trả về danh sách capabilities của plugin"""
-    return {
-        "capabilities": [
-            {
-                "intent": "get_teams",
-                "description": "Lấy danh sách teams của user",
-                "parameters": []
-            },
-            {
-                "intent": "get_channels",
-                "description": "Lấy danh sách channels của team",
-                "parameters": ["team_id"]
-            },
-            {
-                "intent": "send_message",
-                "description": "Gửi tin nhắn đến channel hoặc chat",
-                "parameters": ["content", "team_id", "channel_id", "chat_id"]
-            },
-            {
-                "intent": "get_chats",
-                "description": "Lấy danh sách group chats",
-                "parameters": []
-            },
-            {
-                "intent": "get_calendars",
-                "description": "Lấy danh sách calendars",
-                "parameters": []
-            },
-            {
-                "intent": "get_events",
-                "description": "Lấy events từ calendar",
-                "parameters": ["calendar_id"]
+            payload = {
+                "query": query,
+                "session_id": session_id,
+                "context": context,
+                "use_rag": True,
+                "max_sources": 5
             }
-        ]
-    }
+            response = await self.client.post(
+                f"{self.base_url}/api/v1/copilot/chat",
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to process chat query: {e}")
+            raise HTTPException(status_code=500, detail="Failed to process query")
+    
+    async def search_documents(
+        self, 
+        access_token: str, 
+        query: str, 
+        search_type: str = "semantic",
+        limit: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Search documents using semantic search
+        
+        Args:
+            access_token: Azure AD access token
+            query: Search query
+            search_type: Type of search (semantic, keyword, hybrid)
+            limit: Number of results
+            
+        Returns:
+            Search results
+        """
+        try:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            payload = {
+                "query": query,
+                "search_type": search_type,
+                "limit": limit,
+                "threshold": 0.7
+            }
+            response = await self.client.post(
+                f"{self.base_url}/api/v1/copilot/search",
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to search documents: {e}")
+            raise HTTPException(status_code=500, detail="Failed to search documents")
+    
+    async def get_chat_history(
+        self, 
+        access_token: str, 
+        session_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get chat history
+        
+        Args:
+            access_token: Azure AD access token
+            session_id: Chat session ID
+            
+        Returns:
+            Chat history
+        """
+        try:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            params = {"session_id": session_id} if session_id else {}
+            response = await self.client.get(
+                f"{self.base_url}/api/v1/chat/history",
+                headers=headers,
+                params=params
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Failed to get chat history: {e}")
+            raise HTTPException(status_code=500, detail="Failed to retrieve chat history")
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """
+        Health check for the plugin
+        
+        Returns:
+            Health status
+        """
+        try:
+            # Check if we're in development mode
+            import os
+            if os.getenv("ENVIRONMENT", "development") == "development":
+                # Mock health check for development
+                return {
+                    "status": "healthy",
+                    "message": "Plugin running in development mode",
+                    "iris_api": "mock",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            # Real health check for production
+            response = await self.client.get(f"{self.base_url}/api/v1/copilot/health")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Health check failed: {e}")
+            return {"status": "unhealthy", "error": str(e)}
+        except Exception as e:
+            logger.error(f"Health check error: {e}")
+            return {"status": "unhealthy", "error": str(e)}
+    
+    async def close(self):
+        """Close HTTP client"""
+        await self.client.aclose()
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+
+# Global plugin handler instance
+plugin_handler = CopilotPluginHandler()

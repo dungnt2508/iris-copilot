@@ -1,377 +1,428 @@
-# Hướng dẫn triển khai Microsoft Copilot Plugin
+# 🚀 HƯỚNG DẪN DEPLOYMENT MICROSOFT COPILOT PLUGIN
 
-## **Tổng quan**
+## 📋 Tổng quan
 
-Microsoft Copilot Plugin cho phép users tương tác với IRIS Teams API thông qua các nền tảng M365 như Teams, Outlook, Word, Excel, PowerPoint, SharePoint, và Windows 11 Copilot.
+Hướng dẫn này sẽ giúp bạn deploy IRIS Copilot Plugin lên Microsoft Copilot và tích hợp với hệ thống IRIS.
 
-## **Kiến trúc**
+## 🎯 Yêu cầu hệ thống
 
-```
-User → Microsoft Copilot → IRIS Plugin → IRIS API → Microsoft Graph API
-```
+### Prerequisites
+- ✅ Azure AD tenant đã được cấu hình
+- ✅ IRIS Backend API đã được deploy
+- ✅ Domain name (iris.pnj.com.vn) đã được cấu hình
+- ✅ SSL certificate cho HTTPS
+- ✅ Microsoft Copilot Studio access
 
-## **Bước 1: Chuẩn bị Infrastructure**
-
-### **1.1. Deploy IRIS API**
+### Azure AD Configuration
 ```bash
-# Deploy IRIS API lên production
-# Ví dụ: Azure App Service, AWS ECS, Google Cloud Run
+# Các permission cần thiết cho Azure AD App
+- User.Read
+- Team.ReadBasic.All
+- Channel.ReadBasic.All
+- ChannelMessage.Send
+- Group.Read.All
+- Calendars.Read
+- Events.Read
 ```
 
-### **1.2. Deploy Copilot Plugin**
-```bash
-# Deploy plugin handler
-cd copilot-plugin
-pip install -r requirements.txt
-python plugin_handler.py
+## 🏗️ Cấu trúc Plugin
+
+```
+copilot-plugin/
+├── manifest.json          # Teams app manifest
+├── plugin.json            # Copilot plugin config
+├── openapi.json           # API specification
+├── plugin_handler.py      # Plugin logic
+├── DEPLOYMENT.md          # This file
+└── icons/                 # App icons
+    ├── outline.png
+    └── color.png
 ```
 
-### **1.3. Cấu hình Domain và SSL**
-```bash
-# Cần có domain với SSL certificate
-# Ví dụ: https://iris.pnj.com.vn
-# Ví dụ: https://copilot.iris.pnj.com.vn
-```
+## 📦 Bước 1: Chuẩn bị Plugin Files
 
-## **Bước 2: Cấu hình Azure AD**
-
-### **2.1. Tạo App Registration cho Plugin**
-1. Vào Azure Portal → Azure Active Directory → App registrations
-2. Click "New registration"
-3. Điền thông tin:
-   - **Name**: IRIS Copilot Plugin
-   - **Supported account types**: Accounts in this organizational directory only
-   - **Redirect URI**: https://iris.pnj.com.vn/auth/callback
-
-### **2.2. Cấu hình API Permissions**
-Thêm các permissions:
-- `User.Read`
-- `Team.ReadBasic.All`
-- `Channel.ReadBasic.All`
-- `ChannelMessage.Send`
-- `Chat.Read`
-- `ChatMessage.Send`
-- `Calendars.Read`
-- `Calendars.ReadWrite`
-
-### **2.3. Tạo Client Secret**
-1. Certificates & secrets → New client secret
-2. Lưu secret value
-
-## **Bước 3: Cấu hình Plugin**
-
-### **3.1. Cập nhật manifest.json**
+### 1.1 Cập nhật manifest.json
 ```json
 {
-  "id": "YOUR_APP_ID",
+  "manifestVersion": "1.14",
+  "version": "1.0.0",
+  "id": "{{TEAMS_APP_ID}}",
+  "packageName": "com.iris.teams.copilot",
+  "developer": {
+    "name": "IRIS Team",
+    "websiteUrl": "https://iris.pnj.com.vn",
+    "privacyUrl": "https://iris.pnj.com.vn/privacy",
+    "termsOfUseUrl": "https://iris.pnj.com.vn/terms"
+  },
+  "name": {
+    "short": "IRIS Teams Copilot",
+    "full": "IRIS Teams Integration for Microsoft Copilot"
+  },
+  "description": {
+    "short": "Tích hợp IRIS Teams với Microsoft Copilot",
+    "full": "Plugin cho phép Microsoft Copilot tương tác với IRIS Teams API để quản lý teams, channels, và gửi tin nhắn."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#FFFFFF",
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
   "validDomains": [
     "iris.pnj.com.vn"
-  ]
-}
-```
-
-### **3.2. Cập nhật plugin.json**
-```json
-{
-  "auth": {
-    "client_url": "https://iris.pnj.com.vn/auth",
-    "authorization_url": "https://login.microsoftonline.com/YOUR_TENANT_ID/oauth2/v2.0/authorize",
-    "token_url": "https://login.microsoftonline.com/YOUR_TENANT_ID/oauth2/v2.0/token"
+  ],
+  "webApplicationInfo": {
+    "id": "{{TEAMS_APP_ID}}",
+    "resource": "https://iris.pnj.com.vn"
   },
-  "api": {
-    "url": "https://iris.pnj.com.vn/api/v1/openapi.json"
+  "copilotExtensions": {
+    "plugins": [
+      {
+        "file": "plugin.json",
+        "id": "iris-teams-plugin"
+      }
+    ]
   }
 }
 ```
 
-### **3.3. Cập nhật OpenAPI spec**
+### 1.2 Cập nhật plugin.json
 ```json
 {
-  "servers": [
-    {
-      "url": "https://iris.pnj.com.vn/api/v1",
-      "description": "Production server"
-    }
-  ]
+  "schema": "https://raw.githubusercontent.com/microsoft/OpenAPI.NET.OData/main/schemas/v4.0.0/OpenAPI.json",
+  "apiVersion": "1.0.0",
+  "nameForHuman": "IRIS Teams Copilot",
+  "nameForModel": "iris_teams_copilot",
+  "descriptionForHuman": "Plugin để tương tác với IRIS Teams API, cho phép quản lý teams, channels, và gửi tin nhắn.",
+  "descriptionForModel": "Plugin này cung cấp các chức năng để tương tác với Microsoft Teams thông qua IRIS API. Bao gồm: lấy danh sách teams, channels, gửi tin nhắn, và quản lý group chats.",
+  "auth": {
+    "type": "oauth2",
+    "instructions": "Sử dụng Azure AD để xác thực với IRIS Teams API",
+    "client_url": "https://iris.pnj.com.vn/auth",
+    "scope": "https://graph.microsoft.com/User.Read https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/ChannelMessage.Send",
+    "authorization_url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://iris.pnj.com.vn/api/v1/openapi.json",
+    "isUserAuthenticated": true
+  },
+  "logo_url": "https://iris.pnj.com.vn/logo.png",
+  "contact_email": "support@iris.pnj.com.vn",
+  "legal_info_url": "https://iris.pnj.com.vn/legal"
 }
 ```
 
-## **Bước 4: Deploy lên Microsoft**
+## 🔧 Bước 2: Cấu hình Azure AD
 
-### **4.1. Package Plugin**
+### 2.1 Tạo Azure AD App Registration
 ```bash
-# Tạo package cho Teams app
-npm install -g @microsoft/teamsfx-cli
-teamsfx package --env prod
+# 1. Truy cập Azure Portal > App registrations
+# 2. Click "New registration"
+# 3. Điền thông tin:
+#    - Name: IRIS Copilot Plugin
+#    - Supported account types: Accounts in this organizational directory only
+#    - Redirect URI: https://iris.pnj.com.vn/auth/callback
+
+# 4. Lưu lại Application (client) ID và Directory (tenant) ID
 ```
 
-### **4.2. Submit to Microsoft**
-1. Vào [Microsoft Teams Admin Center](https://admin.teams.microsoft.com/)
-2. Teams apps → Manage apps
-3. Upload custom app
-4. Upload file .zip đã tạo
-
-### **4.3. Publish to App Store (Optional)**
-1. Vào [Microsoft AppSource](https://appsource.microsoft.com/)
-2. Submit app để review
-3. Sau khi approved, app sẽ có sẵn cho tất cả users
-
-## **Bước 5: Cấu hình cho Users**
-
-### **5.1. Admin Configuration**
-```powershell
-# PowerShell script để cấu hình cho organization
-Connect-MicrosoftTeams
-
-# Enable plugin cho organization
-Set-TeamsAppPermissionPolicy -Identity "Global" -AllowedAppIds @("YOUR_APP_ID")
-
-# Assign plugin cho users
-Grant-CsTeamsAppPermissionPolicy -Identity "user@domain.com" -PolicyName "Global"
-```
-
-### **5.2. User Setup**
-1. User mở Teams
-2. Apps → Browse all apps
-3. Tìm "IRIS Teams Copilot"
-4. Click "Add"
-
-## **Bước 6: Testing**
-
-### **6.1. Test Plugin Endpoints**
+### 2.2 Cấu hình API Permissions
 ```bash
-# Test health check
-curl https://iris.pnj.com.vn/copilot/health
+# 1. Vào "API permissions"
+# 2. Click "Add a permission"
+# 3. Chọn "Microsoft Graph"
+# 4. Chọn "Delegated permissions"
+# 5. Thêm các permissions:
+#    - User.Read
+#    - Team.ReadBasic.All
+#    - Channel.ReadBasic.All
+#    - ChannelMessage.Send
+#    - Group.Read.All
+#    - Calendars.Read
+#    - Events.Read
 
-# Test capabilities
-curl https://iris.pnj.com.vn/copilot/capabilities
-
-# Test plugin processing
-curl -X POST https://iris.pnj.com.vn/copilot/process \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "user123",
-    "intent": "get_teams",
-    "parameters": {},
-    "context": {}
-  }'
+# 6. Click "Grant admin consent"
 ```
 
-### **6.2. Test trong Teams**
-1. Mở Teams chat
-2. Gõ "@IRIS Teams Copilot"
-3. Thử các commands:
-   - "Show my teams"
-   - "Send message to General channel: Hello from Copilot!"
-   - "Show my calendars"
-
-## **Bước 7: Monitoring và Analytics**
-
-### **7.1. Logging**
-```python
-# Cấu hình logging
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('copilot-plugin.log'),
-        logging.StreamHandler()
-    ]
-)
-```
-
-### **7.2. Metrics**
-```python
-# Track usage metrics
-from prometheus_client import Counter, Histogram
-
-request_counter = Counter('copilot_requests_total', 'Total requests', ['intent', 'status'])
-request_duration = Histogram('copilot_request_duration_seconds', 'Request duration')
-```
-
-### **7.3. Alerting**
-```yaml
-# Prometheus alert rules
-groups:
-  - name: copilot_alerts
-    rules:
-      - alert: HighErrorRate
-        expr: rate(copilot_requests_total{status="error"}[5m]) > 0.1
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High error rate in Copilot plugin"
-```
-
-## **Bước 8: Security**
-
-### **8.1. Authentication**
-```python
-# Validate tokens
-async def validate_token(token: str) -> bool:
-    try:
-        # Verify JWT token
-        decoded = jwt.decode(token, options={"verify_signature": False})
-        return True
-    except:
-        return False
-```
-
-### **8.2. Rate Limiting**
-```python
-# Implement rate limiting
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-
-@app.post("/copilot/process")
-@limiter.limit("10/minute")
-async def process_copilot_request(request: Request):
-    # ...
-```
-
-### **8.3. Input Validation**
-```python
-# Validate input parameters
-from pydantic import validator
-
-class CopilotRequest(BaseModel):
-    user_id: str
-    intent: str
-    parameters: Dict[str, Any] = {}
-    
-    @validator('intent')
-    def validate_intent(cls, v):
-        allowed_intents = ['get_teams', 'send_message', 'get_calendars']
-        if v not in allowed_intents:
-            raise ValueError(f'Invalid intent: {v}')
-        return v
-```
-
-## **Troubleshooting**
-
-### **Common Issues**
-
-1. **Plugin không hiển thị trong Teams**
-   - Kiểm tra app đã được approve chưa
-   - Kiểm tra permissions policy
-   - Kiểm tra domain validation
-
-2. **Authentication errors**
-   - Kiểm tra Azure AD configuration
-   - Kiểm tra redirect URIs
-   - Kiểm tra client secret
-
-3. **API calls failing**
-   - Kiểm tra IRIS API status
-   - Kiểm tra network connectivity
-   - Kiểm tra CORS configuration
-
-### **Debug Commands**
+### 2.3 Tạo Client Secret
 ```bash
-# Check plugin status
-curl -X GET https://iris.pnj.com.vn/copilot/health
-
-# Check API status
-curl -X GET https://iris.pnj.com.vn/api/v1/teams/teams \
-  -H "Authorization: Bearer YOUR_TOKEN"
-
-# Check logs
-tail -f copilot-plugin.log
+# 1. Vào "Certificates & secrets"
+# 2. Click "New client secret"
+# 3. Điền description và chọn expiration
+# 4. Copy và lưu secret value
 ```
 
-## **Performance Optimization**
+## 🌐 Bước 3: Deploy IRIS Backend
 
-### **8.1. Caching**
-```python
-# Implement caching
-import redis
-from functools import lru_cache
+### 3.1 Cấu hình Environment Variables
+```bash
+# .env file
+AZURE_AD_CLIENT_ID=your-client-id
+AZURE_AD_CLIENT_SECRET=your-client-secret
+AZURE_AD_TENANT_ID=your-tenant-id
+AZURE_AD_REDIRECT_URI=https://iris.pnj.com.vn/api/v1/azure-ad/callback
+AZURE_AD_AUTHORITY=https://login.microsoftonline.com
+AZURE_AD_GRAPH_ENDPOINT=https://graph.microsoft.com/v1.0
+AZURE_AD_SCOPES=https://graph.microsoft.com/User.Read,https://graph.microsoft.com/Team.ReadBasic.All,https://graph.microsoft.com/Channel.ReadBasic.All,https://graph.microsoft.com/ChannelMessage.Send
 
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+# Database
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/iris_db
 
-@lru_cache(maxsize=100)
-async def get_teams_cached(user_id: str):
-    # Cache teams data for 5 minutes
-    cache_key = f"teams:{user_id}"
-    cached = redis_client.get(cache_key)
-    if cached:
-        return json.loads(cached)
-    
-    # Fetch from API
-    teams = await fetch_teams_from_api(user_id)
-    redis_client.setex(cache_key, 300, json.dumps(teams))
-    return teams
+# OpenAI
+OPENAI_API_KEY=your-openai-key
+
+# Security
+SECRET_KEY=your-secret-key
+JWT_ALGORITHM=HS256
 ```
 
-### **8.2. Connection Pooling**
-```python
-# Use connection pooling
-import httpx
+### 3.2 Deploy với Docker
+```bash
+# Build image
+docker build -t iris-backend:latest .
 
-async with httpx.AsyncClient(
-    limits=httpx.Limits(max_keepalive_connections=20, max_connections=100)
-) as client:
-    # Use client for API calls
+# Run container
+docker run -d \
+  --name iris-backend \
+  -p 8000:8000 \
+  --env-file .env \
+  iris-backend:latest
 ```
 
-## **Scaling**
-
-### **8.1. Horizontal Scaling**
-```yaml
-# Docker Compose for scaling
-version: '3.8'
-services:
-  copilot-plugin:
-    image: iris/copilot-plugin:latest
-    deploy:
-      replicas: 3
-    environment:
-      - IRIS_API_URL=https://iris.pnj.com.vn
-    ports:
-      - "8001:8001"
-```
-
-### **8.2. Load Balancing**
+### 3.3 Cấu hình Nginx (Optional)
 ```nginx
-# Nginx configuration
-upstream copilot_backend {
-    server copilot1:8001;
-    server copilot2:8001;
-    server copilot3:8001;
+server {
+    listen 80;
+    server_name iris.pnj.com.vn;
+    return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl;
     server_name iris.pnj.com.vn;
     
-    location /copilot/ {
-        proxy_pass http://copilot_backend;
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location / {
+        proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
-## **Maintenance**
+## 🤖 Bước 4: Deploy lên Microsoft Copilot
 
-### **8.1. Regular Updates**
-- Update dependencies monthly
-- Monitor security advisories
-- Update plugin manifest khi có thay đổi
+### 4.1 Tạo Plugin Package
+```bash
+# 1. Tạo ZIP file chứa plugin files
+zip -r iris-copilot-plugin.zip copilot-plugin/
 
-### **8.2. Backup Strategy**
-- Backup configuration files
-- Backup logs và metrics
-- Test recovery procedures
+# 2. Files cần có trong ZIP:
+#    - manifest.json
+#    - plugin.json
+#    - openapi.json
+#    - icons/outline.png
+#    - icons/color.png
+```
 
-### **8.3. Documentation**
-- Maintain user documentation
-- Update API documentation
-- Keep deployment guides current
+### 4.2 Upload lên Microsoft Copilot Studio
+```bash
+# 1. Truy cập Microsoft Copilot Studio
+# 2. Vào "Plugins" section
+# 3. Click "Add plugin"
+# 4. Upload ZIP file
+# 5. Cấu hình authentication
+# 6. Test plugin functionality
+```
+
+### 4.3 Cấu hình Authentication
+```bash
+# 1. Trong Copilot Studio, cấu hình OAuth2:
+#    - Client ID: Azure AD App ID
+#    - Client Secret: Azure AD Client Secret
+#    - Authorization URL: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+#    - Token URL: https://login.microsoftonline.com/common/oauth2/v2.0/token
+#    - Scope: https://graph.microsoft.com/User.Read https://graph.microsoft.com/Team.ReadBasic.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/ChannelMessage.Send
+
+# 2. Test authentication flow
+```
+
+## 🧪 Bước 5: Testing
+
+### 5.1 Test API Endpoints
+```bash
+# Test health check
+curl https://iris.pnj.com.vn/api/v1/copilot/health
+
+# Test authentication
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     https://iris.pnj.com.vn/api/v1/auth/me
+
+# Test teams endpoint
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     https://iris.pnj.com.vn/api/v1/teams/teams
+```
+
+### 5.2 Test Copilot Integration
+```bash
+# 1. Trong Copilot Studio, test các scenarios:
+#    - "Show me my teams"
+#    - "Send a message to General channel"
+#    - "Search for documents about AI"
+#    - "Get my calendar events"
+
+# 2. Verify responses và error handling
+```
+
+## 🔍 Bước 6: Monitoring & Troubleshooting
+
+### 6.1 Logging Configuration
+```python
+# app/core/logger.py
+import structlog
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
+```
+
+### 6.2 Health Check Endpoints
+```bash
+# Health check
+GET /api/v1/copilot/health
+
+# Metrics
+GET /api/v1/metrics
+
+# OpenAPI docs
+GET /api/v1/docs
+```
+
+### 6.3 Common Issues & Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Authentication failed | Invalid token | Check Azure AD configuration |
+| Teams API errors | Missing permissions | Grant admin consent |
+| Plugin not loading | Invalid manifest | Validate JSON schema |
+| CORS errors | Missing headers | Configure CORS middleware |
+
+## 📊 Bước 7: Production Deployment
+
+### 7.1 Production Checklist
+- [ ] SSL certificate installed
+- [ ] Environment variables configured
+- [ ] Database migrations completed
+- [ ] Monitoring setup
+- [ ] Backup strategy implemented
+- [ ] Load testing completed
+- [ ] Security audit passed
+
+### 7.2 Performance Optimization
+```python
+# Caching configuration
+REDIS_URL=redis://localhost:6379/0
+CACHE_TTL=3600
+
+# Database connection pooling
+DATABASE_POOL_SIZE=20
+DATABASE_MAX_OVERFLOW=30
+
+# Rate limiting
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=60
+```
+
+### 7.3 Security Hardening
+```python
+# Security headers
+SECURITY_HEADERS = {
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "X-XSS-Protection": "1; mode=block",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+}
+
+# CORS configuration
+CORS_ORIGINS = [
+    "https://iris.pnj.com.vn",
+    "https://copilot.microsoft.com"
+]
+```
+
+## 📈 Bước 8: Post-Deployment
+
+### 8.1 User Training
+- [ ] Create user documentation
+- [ ] Conduct training sessions
+- [ ] Provide troubleshooting guide
+- [ ] Set up support channels
+
+### 8.2 Monitoring Setup
+- [ ] Application performance monitoring
+- [ ] Error tracking and alerting
+- [ ] Usage analytics
+- [ ] Cost monitoring
+
+### 8.3 Maintenance Plan
+- [ ] Regular security updates
+- [ ] Performance monitoring
+- [ ] Backup verification
+- [ ] Plugin updates
+
+## 🎯 Success Metrics
+
+### Technical Metrics
+- [ ] API response time < 200ms (p95)
+- [ ] 99.9% uptime
+- [ ] Zero security incidents
+- [ ] < 1% error rate
+
+### Business Metrics
+- [ ] User adoption rate
+- [ ] Feature usage statistics
+- [ ] User satisfaction scores
+- [ ] Support ticket reduction
+
+## 📞 Support & Resources
+
+### Documentation
+- [Microsoft Copilot Plugin Documentation](https://docs.microsoft.com/en-us/microsoft-copilot-studio/)
+- [Azure AD Authentication](https://docs.microsoft.com/en-us/azure/active-directory/develop/)
+- [Teams API Reference](https://docs.microsoft.com/en-us/graph/api/resources/teams-api-overview)
+
+### Support Channels
+- Email: support@iris.pnj.com.vn
+- Teams: IRIS Support Channel
+- Documentation: https://iris.pnj.com.vn/docs
+
+---
+
+**Last Updated:** 2025-01-27
+**Version:** 1.0.0
+**Status:** Ready for Deployment
+
 

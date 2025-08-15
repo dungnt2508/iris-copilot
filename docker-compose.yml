@@ -40,12 +40,12 @@ services:
     networks:
       - iris_network
 
-  # Application (Development mode with hot reload)
-  app:
+  # Backend API (Development mode with hot reload)
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: iris_app
+    container_name: iris_backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./app:/app/app
@@ -64,6 +64,24 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - iris_network
+
+  # Copilot Plugin API
+  plugin:
+    build:
+      context: ./copilot-plugin
+      dockerfile: Dockerfile
+    container_name: iris_copilot_plugin
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - IRIS_API_URL=http://backend:8000
+      - IRIS_API_BASE_URL=http://backend:8000/api/v1
+    depends_on:
+      - backend
     networks:
       - iris_network
 

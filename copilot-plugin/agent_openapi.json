@@ -1,0 +1,198 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "IRIS Teams Agent API",
+    "description": "Agent API để xử lý complex workflows với Microsoft Teams",
+    "version": "1.0.0",
+    "contact": {
+      "name": "IRIS Support",
+      "email": "support@iris.pnj.com.vn"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://iris.pnj.com.vn",
+      "description": "Production server"
+    },
+    {
+      "url": "http://localhost:8001",
+      "description": "Development server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/agent/process": {
+      "post": {
+        "summary": "Process agent request with intent recognition",
+        "description": "Xử lý request từ Microsoft Copilot Agent với intent recognition và workflow execution",
+        "operationId": "processAgentRequest",
+        "tags": ["Agent"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent request processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid token"
+          },
+          "400": {
+            "description": "Bad Request - Invalid intent or parameters"
+          }
+        }
+      }
+    },
+    "/agent/workflows": {
+      "get": {
+        "summary": "Get available workflows",
+        "description": "Lấy danh sách các workflows có sẵn",
+        "operationId": "getAvailableWorkflows",
+        "tags": ["Agent"],
+        "responses": {
+          "200": {
+            "description": "List of available workflows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workflows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "intent": {
+                            "type": "string"
+                          },
+                          "parameters": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "AgentRequest": {
+        "type": "object",
+        "required": ["intent"],
+        "properties": {
+          "intent": {
+            "type": "string",
+            "description": "Intent của agent request",
+            "enum": ["send_message", "get_teams", "search_documents", "create_report", "search_and_summarize"]
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Parameters cho intent",
+            "properties": {
+              "team_name": {
+                "type": "string",
+                "description": "Tên team"
+              },
+              "channel_name": {
+                "type": "string",
+                "description": "Tên channel"
+              },
+              "message": {
+                "type": "string",
+                "description": "Nội dung tin nhắn"
+              },
+              "query": {
+                "type": "string",
+                "description": "Search query"
+              },
+              "report_type": {
+                "type": "string",
+                "description": "Loại báo cáo"
+              }
+            }
+          },
+          "context": {
+            "type": "object",
+            "description": "Context từ conversation"
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        }
+      },
+      "AgentResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Thành công hay không"
+          },
+          "data": {
+            "type": "object",
+            "description": "Data response"
+          },
+          "message": {
+            "type": "string",
+            "description": "Message response"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message nếu có"
+          },
+          "available_teams": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Danh sách teams có sẵn (khi team không tìm thấy)"
+          },
+          "available_channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Danh sách channels có sẵn (khi channel không tìm thấy)"
+          }
+        }
+      }
+    }
+  }
+}
